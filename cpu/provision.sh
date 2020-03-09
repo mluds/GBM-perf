@@ -1,101 +1,45 @@
-// R commands
+apt update
+apt install -y r-base libcurl4-openssl-dev git wget libxml2-dev cmake
+Rscript -e "install.packages(c('littler', 'docopt'))"
+ln -s /usr/local/lib/R/site-library/littler/examples/install2.r /usr/local/bin/install2.r
+ln -s /usr/local/lib/R/site-library/littler/bin/r /usr/local/bin/r
 
+cd
+wget https://s3.amazonaws.com/benchm-ml--main/train-0.1m.csv
+wget https://s3.amazonaws.com/benchm-ml--main/train-1m.csv
+wget https://s3.amazonaws.com/benchm-ml--main/train-10m.csv
+wget https://s3.amazonaws.com/benchm-ml--main/test.csv
 
-// RStudio commands
-apt-get update \
-  && apt-get install -y --no-install-recommends \
-    file \
-    git \
-    libapparmor1 \
-    libclang-dev \
-    libcurl4-openssl-dev \
-    libedit2 \
-    libssl-dev \
-    lsb-release \
-    multiarch-support \
-    psmisc \
-    procps \
-    python-setuptools \
-    sudo \
-    wget \
-  && if [ -z "$RSTUDIO_VERSION" ]; \
-    then RSTUDIO_URL="https://www.rstudio.org/download/latest/stable/server/bionic/rstudio-server-latest-amd64.deb"; \
-    else RSTUDIO_URL="http://download2.rstudio.org/server/bionic/amd64/rstudio-server-${RSTUDIO_VERSION}-amd64.deb"; fi \
-  && wget -q $RSTUDIO_URL \
-  && dpkg -i rstudio-server-*-amd64.deb \
-  && rm rstudio-server-*-amd64.deb \
-  ## Symlink pandoc & standard pandoc templates for use system-wide
-  && ln -s /usr/lib/rstudio-server/bin/pandoc/pandoc /usr/local/bin \
-  && ln -s /usr/lib/rstudio-server/bin/pandoc/pandoc-citeproc /usr/local/bin \
-  && git clone --recursive --branch ${PANDOC_TEMPLATES_VERSION} https://github.com/jgm/pandoc-templates \
-  && mkdir -p /opt/pandoc/templates \
-  && cp -r pandoc-templates*/* /opt/pandoc/templates && rm -rf pandoc-templates* \
-  && mkdir /root/.pandoc && ln -s /opt/pandoc/templates /root/.pandoc/templates \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/ \
-  ## RStudio wants an /etc/R, will populate from $R_HOME/etc
-  && mkdir -p /etc/R \
-  ## Write config files in $R_HOME/etc
-  && echo '\n\
-    \n# Configure httr to perform out-of-band authentication if HTTR_LOCALHOST \
-    \n# is not set since a redirect to localhost may not work depending upon \
-    \n# where this Docker container is running. \
-    \nif(is.na(Sys.getenv("HTTR_LOCALHOST", unset=NA))) { \
-    \n  options(httr_oob_default = TRUE) \
-    \n}' >> /usr/local/lib/R/etc/Rprofile.site \
-  && echo "PATH=${PATH}" >> /usr/local/lib/R/etc/Renviron \
-  ## Need to configure non-root user for RStudio
-  && useradd rstudio \
-  && echo "rstudio:rstudio" | chpasswd \
-	&& mkdir /home/rstudio \
-	&& chown rstudio:rstudio /home/rstudio \
-	&& addgroup rstudio staff \
-  ## Prevent rstudio from deciding to use /usr/bin/R if a user apt-get installs a package
-  &&  echo 'rsession-which-r=/usr/local/bin/R' >> /etc/rstudio/rserver.conf \
-  ## use more robust file locking to avoid errors when using shared volumes:
-  && echo 'lock-type=advisory' >> /etc/rstudio/file-locks \
-  ## configure git not to request password each time
-  && git config --system credential.helper 'cache --timeout=3600' \
-  && git config --system push.default simple \
-  ## Set up S6 init system
-  && wget -P /tmp/ https://github.com/just-containers/s6-overlay/releases/download/${S6_VERSION}/s6-overlay-amd64.tar.gz \
-  && tar xzf /tmp/s6-overlay-amd64.tar.gz -C / \
-  && mkdir -p /etc/services.d/rstudio \
-  && echo '#!/usr/bin/with-contenv bash \
-          \n## load /etc/environment vars first: \
-  		  \n for line in $( cat /etc/environment ) ; do export $line ; done \
-          \n exec /usr/lib/rstudio-server/bin/rserver --server-daemonize 0' \
-          > /etc/services.d/rstudio/run \
-  && echo '#!/bin/bash \
-          \n rstudio-server stop' \
-          > /etc/services.d/rstudio/finish \
-  && mkdir -p /home/rstudio/.rstudio/monitored/user-settings \
-  && echo 'alwaysSaveHistory="0" \
-          \nloadRData="0" \
-          \nsaveAction="0"' \
-          > /home/rstudio/.rstudio/monitored/user-settings/user-settings \
-  && chown -R rstudio:rstudio /home/rstudio/.rstudio
+R -e "install.packages('roxygen2', dependencies=TRUE, INSTALL_opts = c('--no-lock'))"
+R -e "install.packages('rversions', dependencies=TRUE, INSTALL_opts = c('--no-lock'))"
+install2.r ROCR data.table magrittr stringi devtools RCurl jsonlite
+install2.r -r http://h2o-release.s3.amazonaws.com/h2o/latest_stable_R h2o
 
+git clone --recursive https://github.com/dmlc/xgboost && \
+    cd xgboost && git submodule init && git submodule update && \
+    cd R-package && R CMD INSTALL .
 
+R -e 'devtools::install_github("Laurae2/lgbdl"); lgbdl::lgb.dl()'
+R -e 'devtools::install_github("catboost/catboost", subdir = "catboost/R-package")'
 
-// Tidyverse commands
-apt-get update -qq && apt-get -y --no-install-recommends install \
-  libxml2-dev \
-  libcairo2-dev \
-  libsqlite-dev \
-  libmariadbd-dev \
-  libmariadbclient-dev \
-  libpq-dev \
-  libssh2-1-dev \
-  unixodbc-dev \
-  libsasl2-dev \
-  && install2.r --error \
-    --deps TRUE \
-    tidyverse \
-    dplyr \
-    devtools \
-    formatR \
-    remotes \
-    selectr \
-    caTools \
-    BiocManager
+cd; git clone https://github.com/szilard/GBM-perf.git
+
+export R_CMD="taskset -c 0-15 R --slave"
+
+cd GBM-perf/cpu/run && \
+  ln -sf ~/test.csv test.csv && \
+  ln -sf ~/train-0.1m.csv train.csv && \
+  echo "0.1m:" && \
+    echo -n "xgboost " && ${R_CMD} < 2-xgboost.R && \
+    echo -n "lightgbm " && ${R_CMD} < 3-lightgbm.R && \
+    echo -n "catboost " && ${R_CMD} < 4-catboost.R && \
+  ln -sf /train-1m.csv train.csv && \
+  echo "1m:" && \
+    echo -n "xgboost " && ${R_CMD} < 2-xgboost.R && \
+    echo -n "lightgbm " && ${R_CMD} < 3-lightgbm.R && \
+    echo -n "catboost " && ${R_CMD} < 4-catboost.R && \
+  ln -sf /train-10m.csv train.csv && \
+  echo "10m:" && \
+    echo -n "xgboost " && ${R_CMD} < 2-xgboost.R && \
+    echo -n "lightgbm " && ${R_CMD} < 3-lightgbm.R && \
+    echo -n "catboost " && ${R_CMD} < 4-catboost.R
