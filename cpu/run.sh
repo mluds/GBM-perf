@@ -1,5 +1,3 @@
-set -e
-
 export R_CMD="taskset -c 0-15 R --slave"
 
 cd ~/GBM-perf/cpu/run && \
@@ -19,3 +17,5 @@ cd ~/GBM-perf/cpu/run && \
     echo -n "xgboost " && ${R_CMD} < 2-xgboost.R && \
     echo -n "lightgbm " && ${R_CMD} < 3-lightgbm.R && \
     echo -n "catboost " && ${R_CMD} < 4-catboost.R
+
+shutdown now
